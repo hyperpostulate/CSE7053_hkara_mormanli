@@ -14,3 +14,10 @@ CALL algo.closeness.stream('*', 'TAKDIR',
 {direction:'out',concurrency:1})
 YIELD nodeId, centrality
 RETURN nodeId, centrality order by centrality desc
+
+
+MATCH (n1{name:1242})-[r:TAKDIR]-(n2) RETURN n1.name, n2.name
+
+MATCH (n1{name:1242})-[r:TAKDIR]-(n2) RETURN n1, n2
+
+MATCH p=(n)-[:TAKDIR]->(m) where n.isManager=true and m.isManager=false RETURN n.uID,m.uID,count(n.uID) ORDER BY n.uID DESC
