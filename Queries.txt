@@ -1,0 +1,16 @@
+//Degree Centrality
+match (n)-[r:TAKDIR]-(m)  
+return n.name, count(r) as DegreeScore  
+order by DegreeScore desc;
+ 
+//Betweenness centrality  
+CALL algo.betweenness.stream('*', 'TAKDIR',
+{direction:'out',concurrency:1})
+YIELD nodeId, centrality
+RETURN nodeId, centrality order by centrality desc
+
+//Closeness Centrality  
+CALL algo.closeness.stream('*', 'TAKDIR',
+{direction:'out',concurrency:1})
+YIELD nodeId, centrality
+RETURN nodeId, centrality order by centrality desc
