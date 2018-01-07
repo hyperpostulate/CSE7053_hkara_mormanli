@@ -17,16 +17,8 @@ ORDER BY n.uID;
 //TAKDIR relation
 MATCH (n)-[r:TAKDIR]->(m) RETURN n.uID as takdir_eden, m.uID as takdir_edilen;
 
-//TESEKKUR relation
-MATCH (n)-[r:TESEKKUR]->(m) RETURN n.uID as tesekkur_eden, m.uID as tesekkur_edilen;
-
 //DOGUMGUNU relation
 MATCH (n)-[r:DOGUMGUNU]->(m) RETURN n.uID as dogumgunu_kutlayan, m.uID as dogumgunu_kutlanan;
-
-//Degree Centrality
-match (n)-[r:TAKDIR]->(m)  
-return m.name, count(r) as DegreeScore,
-order by DegreeScore desc;
  
 //Betweenness centrality for TAKDIR
 CALL algo.betweenness.stream('*', 'TAKDIR',
@@ -40,29 +32,6 @@ CALL algo.closeness.stream('*', 'TAKDIR',
 YIELD nodeId, centrsality
 RETURN nodeId, centrality as closeness_centrality order by nodeId;
 
-//Betweenness centrality for TESEKKUR
-CALL algo.betweenness.stream('*', 'TESEKKUR',
-{direction:'in',concurrency:1})
-YIELD nodeId, centrality
-RETURN nodeId, centrality as betweenness_centrality order by nodeId;
-
-//Closeness centrality for TESEKKUR
-CALL algo.closeness.stream('*', 'TESEKKUR',
-{direction:'in',concurrency:1})
-YIELD nodeId, centrality
-RETURN nodeId, centrality as closeness_centrality order by nodeId;
-
-//Betweenness centrality for DOGUMGUNU
-CALL algo.betweenness.stream('*', 'DOGUMGUNU',
-{direction:'in',concurrency:1})
-YIELD nodeId, centrality
-RETURN nodeId, centrality as betweenness_centrality order by nodeId;
-
-//Closeness centrality for DOGUMGUNU
-CALL algo.closeness.stream('*', 'DOGUMGUNU',
-{direction:'in',concurrency:1})
-YIELD nodeId, centrality
-RETURN nodeId, centrality as closeness_centrality order by nodeId;
 
 /*SQL Queries*/
 
@@ -71,13 +40,70 @@ create table takdir_centralities as
 select tb.nodeId, tb.betweenness_centrality, tc.closeness_centrality from takdir_betwenness_centrality tb, takdir_closeness_centrality tc
 where tb.nodeId = tc.nodeId;
 
-//Aggregate centralities for TESEKKUR
-create table tesekkur_centralities as
-select tb.nodeId, tb.betweenness_centrality, tc.closeness_centrality from tesekkur_betweennes_centrality tb, tesekkur_closenees_centrality tc
-where tb.nodeId = tc.nodeId;
+//Normalized centralities for TAKDIR
+create table takdir_centralities_normalized as
+SELECT nodeId, 
+betweenness_centrality /(SELECT MAX(betweenness_centrality)
+FROM takdir_centralities ) AS betweenness_centrality_normalized, 
+closeness_centrality /(SELECT MAX(closeness_centrality)
+FROM takdir_centralities ) AS closeness_centrality_normalized
+from takdir_centralities;
 
-//Aggregate centralities for DOGUMGUNU
-create table dogumgunu_centralities as
-select tb.nodeId, tb.betweenness_centrality, tc.closeness_centrality from dogumgunu_betweennes_centrality tb, dogumgunu_closeness_centrality tc
-where tb.nodeId = tc.nodeId;
+//Weighted TAKDIR relations regarding departments and DOGUMGUNU
+create table WEIGHTED_TAKDIR_RELATIONS AS
+select wt.takdir_eden, wt.takdir_edilen, wt.DEPARTMENT_WEIGHTED_TAKDIR_SCORE AS DEPARTMENT_WEIGHTED_TAKDIR_SCORE, wt.DOGUMGUNU_WEIGHTED_TAKDIR_SCORE AS DOGUMGUNU_WEIGHTED_TAKDIR_SCORE, (DEPARTMENT_WEIGHTED_TAKDIR_SCORE * DOGUMGUNU_WEIGHTED_TAKDIR_SCORE) AS OVERALL_WEIGHTED_SCORE from 
+(select t.takdir_eden, t.takdir_edilen, 
+CASE
+WHEN ((SELECT ustdepartmanID from nodes where uID = t.takdir_eden) == (SELECT ustdepartmanID from nodes where uID = t.takdir_edilen) AND (SELECT departmanID from nodes where uID = t.takdir_eden) == (SELECT departmanID from nodes where uID = t.takdir_edilen))
+THEN 1
+WHEN ((SELECT ustdepartmanID from nodes where uID = t.takdir_eden) == (SELECT ustdepartmanID from nodes where uID = t.takdir_edilen) AND (SELECT departmanID from nodes where uID = t.takdir_eden) <> (SELECT departmanID from nodes where uID = t.takdir_edilen))
+THEN 2
+ELSE 3
+END DEPARTMENT_WEIGHTED_TAKDIR_SCORE,
+CASE
+WHEN ((t.takdir_edilen in (SELECT d.dogumgunu_kutlayan from dogumgunu d where d.dogumgunu_kutlanan = t.takdir_eden)) AND (t.takdir_eden in (SELECT d.dogumgunu_kutlayan from dogumgunu d where d.dogumgunu_kutlanan = t.takdir_edilen)))
+THEN 1
+WHEN ((t.takdir_edilen in (SELECT d.dogumgunu_kutlayan from dogumgunu d where d.dogumgunu_kutlanan = t.takdir_eden)) AND (t.takdir_eden not in (SELECT d.dogumgunu_kutlayan from dogumgunu d where d.dogumgunu_kutlanan = t.takdir_edilen)))
+THEN 2
+ELSE 3
+END DOGUMGUNU_WEIGHTED_TAKDIR_SCORE
+FROM takdir t) wt;
 
+//WEIGHTED_TAKDIR_SCORES for each node
+create table WEIGHTED_TAKDIR_SCORES AS
+select 
+takdir_edilen as nodeId, 
+sum(DEPARTMENT_WEIGHTED_TAKDIR_SCORE) as DEPARTMENT_WEIGHTED_SCORE, 
+sum(DOGUMGUNU_WEIGHTED_TAKDIR_SCORE) as DOGUMGUNU_WEIGHTED_SCORE, 
+sum(overall_weighted_score) as OVERALL_WEIGHTED_SCORE 
+from WEIGHTED_TAKDIR_RELATIONS group by takdir_edilen order by OVERALL_WEIGHTED_SCORE desc
+
+//Overall Endorsement score with the effect of centrality
+CREATE TABLE OVERALL_ENDORSEMENT_SCORE AS
+select s.uID as nodeId, (s.OVERALL_SCORE * (ifnull(cent.betweenness_centrality_normalized,0) + 1) * (ifnull(cent.closeness_centrality_normalized,0) + 1)) AS FINAL_SCORE from 
+(
+select n.uID, ifnull(te.OVERALL_SCORE, 0) OVERALL_SCORE 
+from nodes n 
+LEFT JOIN (select nodeId, OVERALL_WEIGHTED_SCORE as OVERALL_SCORE from WEIGHTED_TAKDIR_SCORES) te 
+ON n.uID = te.nodeId
+) s LEFT JOIN  takdir_centralities_normalized cent
+on s.uID = cent.nodeId;
+
+/OverAll Scores
+CREATE TABLE OVERALL_SCORES AS
+SELECT A.nodeId AS nodeId, a.TAKDIR_COUNT as TAKDIR_COUNT, b.DEPARTMENT_WEIGHTED_SCORE, b.DOGUMGUNU_WEIGHTED_SCORE, b.OVERALL_WEIGHTED_SCORE, c.FINAL_SCORE AS FINAL_SCORE_WITH_CENTRALITY from
+(select n.uID AS nodeId, ifnull(tc.TAKDIR_COUNT, 0) AS TAKDIR_COUNT from nodes n left join (select t.takdir_edilen as nodeId, count(t.takdir_eden) AS TAKDIR_COUNT from takdir t group by nodeId) tc on n.uID = tc.NodeId) A, 
+(select * from WEIGHTED_TAKDIR_SCORES) B,
+(SELECT * from OVERALL_ENDORSEMENT_SCORE) C
+where a.nodeId = b.nodeId
+and b.nodeId = c.nodeId;
+
+//Normalized OverAll Scores
+CREATE TABLE NORMALIZED_OVERALL_SCORES AS
+SELECT nodeId, 
+((TAKDIR_COUNT * 100) / (SELECT MAX(TAKDIR_COUNT) from overall_scores)) AS NORMALISED_DEGREE_SCORE, 
+((DEPARTMENT_WEIGHTED_SCORE * 100) / (SELECT MAX(DEPARTMENT_WEIGHTED_SCORE) from overall_scores))  AS NORMALISED_DEPARTMENT_WEIGHTED_SCORE, 
+((DOGUMGUNU_WEIGHTED_SCORE * 100) / (SELECT MAX(DOGUMGUNU_WEIGHTED_SCORE) from overall_scores))  AS NORMALISED_DOGUMGUNU_WEIGHTED_SCORE, 
+((OVERALL_WEIGHTED_SCORE * 100) / (SELECT MAX(OVERALL_WEIGHTED_SCORE) from overall_scores)) AS NORMALISED_OVERALL_WEIGHTED_SCORE, 
+((FINAL_SCORE_WITH_CENTRALITY * 100) / (SELECT MAX(FINAL_SCORE_WITH_CENTRALITY) from overall_scores))  AS NORMALISED_FINAL_SCORE_WITH_CENTRALITY
+from overall_scores;
