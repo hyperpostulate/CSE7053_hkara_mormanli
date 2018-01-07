@@ -1,3 +1,5 @@
+/*Cypher Queries*/
+
 //Nodes
 MATCH (n)
 RETURN n.uID as uID,
@@ -61,4 +63,21 @@ CALL algo.closeness.stream('*', 'DOGUMGUNU',
 {direction:'in',concurrency:1})
 YIELD nodeId, centrality
 RETURN nodeId, centrality as closeness_centrality order by nodeId
+
+/*SQL Queries*/
+
+//Aggregate centralities for TAKDIR
+create table takdir_centralities as
+select tb.nodeId, tb.betweenness_centrality, tc.closeness_centrality from takdir_betwenness_centrality tb, takdir_closeness_centrality tc
+where tb.nodeId = tc.nodeId
+
+//Aggregate centralities for TESEKKUR
+create table tesekkur_centralities as
+select tb.nodeId, tb.betweenness_centrality, tc.closeness_centrality from tesekkur_betweennes_centrality tb, tesekkur_closenees_centrality tc
+where tb.nodeId = tc.nodeId
+
+//Aggregate centralities for DOGUMGUNU
+create table dogumgunu_centralities as
+select tb.nodeId, tb.betweenness_centrality, tc.closeness_centrality from dogumgunu_betweennes_centrality tb, dogumgunu_closeness_centrality tc
+where tb.nodeId = tc.nodeId
 
