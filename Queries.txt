@@ -1,23 +1,64 @@
+//Nodes
+MATCH (n)
+RETURN n.uID as uID,
+n.centrality as centrality,
+n.ustdepartmanName as ustdepartmanName,
+n.name as name,
+n.departmanName as departmanName,
+n.isManager as isManager,
+n.departmanID as departmanID,
+n.managerID as managerID,
+n.ustdepartmanID as ustdepartmanID,
+n.isActive as isActive
+ORDER BY n.uID;
+
+//TAKDIR relation
+MATCH (n)-[r:TAKDIR]->(m) RETURN n.uID as takdir_eden, m.uID as takdir_edilen
+
+//TESEKKUR relation
+MATCH (n)-[r:TESEKKUR]->(m) RETURN n.uID as tesekkur_eden, m.uID as tesekkur_edilen
+
+//DOGUMGUNU relation
+MATCH (n)-[r:DOGUMGUNU]->(m) RETURN n.uID as dogumgunu_kutlayan, m.uID as dogumgunu_kutlanan
+
 //Degree Centrality
-match (n)-[r:TAKDIR]-(m)  
-return n.name, count(r) as DegreeScore  
+match (n)-[r:TAKDIR]->(m)  
+return m.name, count(r) as DegreeScore,
 order by DegreeScore desc;
  
-//Betweenness centrality  
+//Betweenness centrality for TAKDIR
 CALL algo.betweenness.stream('*', 'TAKDIR',
-{direction:'out',concurrency:1})
+{direction:'in',concurrency:1})
 YIELD nodeId, centrality
-RETURN nodeId, centrality order by centrality desc
+RETURN nodeId, centrality as betweenness_centrality order by nodeId
 
-//Closeness Centrality  
+//Closeness centrality for TAKDIR
 CALL algo.closeness.stream('*', 'TAKDIR',
-{direction:'out',concurrency:1})
+{direction:'in',concurrency:1})
 YIELD nodeId, centrality
-RETURN nodeId, centrality order by centrality desc
+RETURN nodeId, centrality as closeness_centrality order by nodeId
 
+//Betweenness centrality for TESEKKUR
+CALL algo.betweenness.stream('*', 'TESEKKUR',
+{direction:'in',concurrency:1})
+YIELD nodeId, centrality
+RETURN nodeId, centrality as betweenness_centrality order by nodeId
 
-MATCH (n1{name:1242})-[r:TAKDIR]-(n2) RETURN n1.name, n2.name
+//Closeness centrality for TESEKKUR
+CALL algo.closeness.stream('*', 'TESEKKUR',
+{direction:'in',concurrency:1})
+YIELD nodeId, centrality
+RETURN nodeId, centrality as closeness_centrality order by nodeId
 
-MATCH (n1{name:1242})-[r:TAKDIR]-(n2) RETURN n1, n2
+//Betweenness centrality for DOGUMGUNU
+CALL algo.betweenness.stream('*', 'DOGUMGUNU',
+{direction:'in',concurrency:1})
+YIELD nodeId, centrality
+RETURN nodeId, centrality as betweenness_centrality order by nodeId
 
-MATCH p=(n)-[:TAKDIR]->(m) where n.isManager=true and m.isManager=false RETURN n.uID,m.uID,count(n.uID) ORDER BY n.uID DESC
+//Closeness centrality for DOGUMGUNU
+CALL algo.closeness.stream('*', 'DOGUMGUNU',
+{direction:'in',concurrency:1})
+YIELD nodeId, centrality
+RETURN nodeId, centrality as closeness_centrality order by nodeId
+
