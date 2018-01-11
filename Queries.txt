@@ -127,7 +127,7 @@ ON n.uID = te.nodeId
 LEFT JOIN  takdir_centralities_normalized cent
 on s.uID = cent.nodeId;
 
-/Aggregate all scores.
+//Aggregate all scores.
 CREATE TABLE OVERALL_SCORES AS
 SELECT A.nodeId AS nodeId, 
 a.TAKDIR_COUNT AS TAKDIR_COUNT, 
