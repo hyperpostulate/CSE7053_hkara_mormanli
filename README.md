@@ -8,3 +8,5 @@ The goal is discriminate 'pure' professional endorsements from so-called 'profes
 and observe these misleading effects quantitatively, to reveal 'true' significance of a employee.
 
 To calculate centrality metrics, we used 'Neo4j Graph Algorithms Release 3.3.0.0' https://neo4j-contrib.github.io/neo4j-graph-algorithms/releases.
+
+[![No Maintenance Intended](http://unmaintained.tech/badge.svg)](http://unmaintained.tech/)
